@@ -3,6 +3,8 @@ const fs = require('fs');
 var bodyParser = require('body-parser');
 const app = express()
 const port = 3000
+/// you should start using modules, not all the logic should be in one file
+
 
 //structure of code will be much better with db 
 
@@ -12,10 +14,13 @@ app.use(express.json());
 app.use(express.static('public')); 
 
 app.use((req,res,next)=>{
-    let logObj = {
+ // destruct 
+    //const {url,method} = req;
+    let logObj = { 
+        
         url:req.url,
         method:req.method,
-        CurrentTime:new Date()
+        CurrentTime:new Date() 
     }
     console.log(logObj)
     next();  ///needed to get out the middleware
@@ -23,6 +28,7 @@ app.use((req,res,next)=>{
 
 ///global error handling middleware
 app.use((err, req, res, next) => {
+    // as an enhancement, you should get the status from the err object, not all the error statuses should be 500
     console.error(err.stack)
     res.status(500).send('internal server error !')
     next();
@@ -30,7 +36,9 @@ app.use((err, req, res, next) => {
 
 
 ///////main routes for todos
-app.get('/', (req, res) =>{
+app.get('/', (req, res) =>{ // do you know, you can use an array for routes that you want to match 
+    //like this 
+    //app.get(["/","/api/todos"],(req,res)=>{})
     res.redirect('/api/todos');
 })
 
@@ -42,18 +50,18 @@ app.get('/api/todos', (req, res) =>{
 
 ///tried to make it better??
 // app.get('/api/todos', (req,res)=> getAllTodos(req,res));
-
+// all these functions either add them to their helper module or put them on the top
 function getAllTodos(){
     //sync func
-    const todos = fs.readFileSync('./db.json',{encoding:'utf-8'});
+    const todos = fs.readFileSync('./db.json',{encoding:'utf-8'}); //we have grown now, we should be using the async functions
     return todos
 }
 
 ///api to post new todo to specific user
 app.post('/api/todos/', (req, res) =>{
-    const todo = req.body;
-    let newId = addNewTodo(todo.title,todo.username);
-    if(newId === 9999)
+    const todo = req.body; //destruct
+    let newId = addNewTodo(todo.title,todo.username); //const
+    if(newId === 9999) // this is confusing, like why 9999 would equal not logged in, also what happens when you actually have 10000 todos
         res.send(`<p>you are not logged in</p>`);
     else if(newId === -1)
         res.send(`<p>username not exist</p>`);
@@ -63,13 +71,13 @@ app.post('/api/todos/', (req, res) =>{
 
 function addNewTodo(title,username){
     let TodosList = getTodosObj();
-    let LoggedUsername = getLoggedInUsername();
+    let LoggedUsername = getLoggedInUsername(); // what happens when you have multiple logged in users
     let check = checkIfUserExist(username)
     if(LoggedUsername === username && check){
         ///prepare the new todo
         const newId = TodosList.length+1;
         const newTodo = { id: newId, title: title, status: 'todo', username: username } 
-        TodosList.push(newTodo);
+        TodosList.push(newTodo); // don't mutate , use concat 
         let obj ={ToDos:TodosList}
         putObjToFile(obj,"db");
         return newId;
@@ -83,7 +91,7 @@ function addNewTodo(title,username){
 
 ///api to get todos of specific user
 app.get('/api/todos/:username', (req, res) =>{
-    const username = req.params.username;
+    const username = req.params.username; //destruct
     const userTodos = getUserTodos(username);
     res.send(userTodos);
 })
@@ -98,7 +106,7 @@ function getUserTodos(username){
 app.delete('/api/todos/:id', (req, res) =>{
     const id = req.params.id;
     deleteTodoWithId(id);
-    res.send(`<p>Todo with id ${id} was deleted successfully</p>`);
+    res.send(`<p>Todo with id ${id} was deleted successfully</p>`); // what if there's no todo with this id
 })
 
 function deleteTodoWithId(id){
@@ -123,7 +131,7 @@ app.patch('/api/todos/:id', (req, res) =>{
 function editTodoWithId(id,newTitle, newStatus){
     let flag = 0;
     let TodosList = getTodosObj();
-    let LoggedUsername = getLoggedInUsername();
+    let LoggedUsername = getLoggedInUsername(); //this is falty, check the comments below in the func def
     //to get edit the todo with id
     TodosList = TodosList.map( todo => {
         if(todo.id === parseInt(id) && todo.username === LoggedUsername){
@@ -145,7 +153,7 @@ function editTodoWithId(id,newTitle, newStatus){
 app.post('/api/users/register', (req, res) =>{
     const user = req.body;
     if(user.username && user.password && user.firstname){
-        let check = addNewUser(user.username , user.password , user.firstname);
+        let check = addNewUser(user.username , user.password , user.firstname); //use good var names 
         if(!check) ///unique username
             res.send(`<p>user was registered successfully</p>`);
         else ///username already exists
@@ -243,7 +251,7 @@ function logoutUser(){
     let flag = 0;
     let UsersList = getUsersObj();
     ///check if there is already a logged In user
-    UsersList = UsersList.map( user => {
+    UsersList = UsersList.map( user => { // this will log out all the users at once not one user 
         if(user.loggedIn === true){
             user.loggedIn = false
             flag = 1;
@@ -265,13 +273,13 @@ function getUsersObj(){
 }
 
 function getTodosObj(){
-    const todos = fs.readFileSync('./db.json',{encoding:'utf-8'});
+    const todos = fs.readFileSync('./db.json',{encoding:'utf-8'}); // use the promise/async version
     const TodosObj = JSON.parse(todos)
     return TodosObj.ToDos;
 }
 
 function putObjToFile(obj,file){
-    fs.writeFile(`./${file}.json`,JSON.stringify(obj),(err)=>{
+    fs.writeFile(`./${file}.json`,JSON.stringify(obj),(err)=>{ //when not the promisified version
         if (err) throw err;
         console.log('The json file has been modified!');
     })
@@ -281,7 +289,10 @@ function getLoggedInUsername(){
     let username;
     let UsersList = getUsersObj();
     UsersList = UsersList.map( user => {
-        if(user.loggedIn === true){
+        if(user.loggedIn === true){ // the logic here is flawed, first of all you're mapping through an array and not using the returned array for anything
+            //also you're only dealing with the last logged in user,so this function will fail when you have multiple logged in users
+            // your getLoggedInUsername should accept the username, and check if this particular username is logged in or not.
+            // also if you're just looping through the array use forEach, if you're looping to get another array but with different values use map, and use reduce when you want to transform the array into another type
             username = user.username
         }
         return user
@@ -291,7 +302,7 @@ function getLoggedInUsername(){
 
 function checkIfUserExist(username){
     let flag = 0;
-    let UsersList = getUsersObj();
+    let UsersList = getUsersObj(); //use filter instead of map
     UsersList = UsersList.map( user => {
         if(user.username === username){
             flag = 1;
